@@ -98,7 +98,7 @@ func TestManifestReadersIgnoreExecutionMetadata(t *testing.T) {
 	}
 }
 
-func TestNormalizeBuildSnapshotRejectsInvalidHXArtifacts(t *testing.T) {
+func TestAcquireBuildSnapshotRejectsInvalidHXArtifacts(t *testing.T) {
 	t.Log("Define malformed HX artifact inventories")
 	tests := []struct {
 		name    string
@@ -123,11 +123,13 @@ func TestNormalizeBuildSnapshotRejectsInvalidHXArtifacts(t *testing.T) {
 			case "singleton selected prop-sync chain":
 				fixture.selectedPropSyncChains = [][]uint32{{1}}
 			}
-			snapshot := acquireTestSnapshot(t, writeCompilerFixture(t, fixture))
+			buildDir := writeCompilerFixture(t, fixture)
 
-			t.Log("Reject malformed HX artifacts during manifest normalization")
-			_, err := normalizeBuildSnapshot(snapshot)
+			t.Log("Reject malformed HX artifacts before publishing the acquired snapshot")
+			snapshot, err := (&defaultModelRegistry{}).AcquireBuildSnapshot(t.Context(), buildDir)
+			require.ErrorIs(t, err, errInvalidBuildManifest)
 			require.ErrorContains(t, err, test.wantErr)
+			require.Nil(t, snapshot)
 		})
 	}
 }
