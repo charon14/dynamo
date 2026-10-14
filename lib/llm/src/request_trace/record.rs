@@ -13,9 +13,11 @@ use crate::request_trace::RequestTracePayload;
 use super::RequestTraceEventType;
 use super::RequestTraceMetrics;
 use super::RequestTraceRecord;
+use super::RequestTraceRouterSelection;
 use super::RequestTraceSchema;
 use super::RequestTraceWorkerInfo;
 use super::publish;
+use dynamo_kv_router::protocols::SelectionTrace;
 
 fn unix_time_ms() -> u64 {
     SystemTime::now()
@@ -100,6 +102,7 @@ pub(crate) fn emit_request_end(
         agent_context: None,
         request: Some(request),
         tool: None,
+        selection: None,
         payload: None,
     });
 }
@@ -117,6 +120,7 @@ pub(crate) fn emit_agent_request_end(
         agent_context: Some(agent_context),
         request: Some(request),
         tool: None,
+        selection: None,
         payload: None,
     });
 }
@@ -130,7 +134,56 @@ pub(crate) fn emit_request_payload(payload: RequestTracePayload, event_time_unix
         agent_context: None,
         request: None,
         tool: None,
+        selection: None,
         payload: Some(payload),
+    });
+}
+
+/// Round a selection cost to three decimals: the precision the router's debug
+/// rows print, far below any difference the picker acts on, and about half the
+/// JSON bytes of the shortest round-trip representation.
+fn round_cost(cost: f64) -> f64 {
+    (cost * 1e3).round() / 1e3
+}
+
+/// Publish one `router_selection` row. Runs on the routing task, never on the
+/// scheduler actor; building the candidate list is O(retained rows).
+pub(crate) fn emit_router_selection(
+    request_id: &str,
+    worker_type: &'static str,
+    trace: SelectionTrace,
+) {
+    let SelectionTrace {
+        candidate_count,
+        pinned,
+        rows,
+    } = trace;
+    let candidates = rows
+        .into_iter()
+        .map(|row| {
+            (
+                row.worker.worker_id,
+                row.worker.dp_rank,
+                round_cost(row.cost),
+            )
+        })
+        .collect();
+    publish(RequestTraceRecord {
+        schema: RequestTraceSchema::V1,
+        event_type: RequestTraceEventType::RouterSelection,
+        event_time_unix_ms: unix_time_ms(),
+        event_source: Some(RequestTraceEventSource::Dynamo),
+        agent_context: None,
+        request: None,
+        tool: None,
+        payload: None,
+        selection: Some(RequestTraceRouterSelection {
+            request_id: request_id.to_string(),
+            worker_type: worker_type.to_string(),
+            pinned,
+            candidate_count: candidate_count as u64,
+            candidates,
+        }),
     });
 }
 
@@ -245,6 +298,17 @@ mod tests {
     }
 
     #[test]
+    fn selection_costs_round_to_three_decimals() {
+        assert_eq!(round_cost(96.87549), 96.875);
+        assert_eq!(round_cost(12.3456789), 12.346);
+        assert_eq!(round_cost(0.0), 0.0);
+        assert_eq!(
+            serde_json::to_string(&round_cost(12.3456789)).unwrap(),
+            "12.346"
+        );
+    }
+
+    #[test]
     fn rejects_non_finite_tool_duration() {
         let mut record = RequestTraceRecord {
             schema: RequestTraceSchema::V1,
@@ -272,6 +336,7 @@ mod tests {
                 error_type: None,
             }),
             payload: None,
+            selection: None,
         };
 
         let err = validate_tool_record(&record).expect_err("NaN duration should fail validation");
