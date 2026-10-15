@@ -17,6 +17,11 @@ import (
 
 const testPart11Path = "part-11"
 
+const (
+	localPartitionTopologyA = "stage-a"
+	localPartitionTopologyB = "stage-b"
+)
+
 func TestProjectModelV2LocalPartitions(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -78,8 +83,10 @@ func TestProjectModelV2LocalPartitions(t *testing.T) {
 			normalized := acquireTestSnapshot(t, writeV2CompilerFixture(t))
 			build := normalized.build
 			build.CompilationMode = BuildCompilationModeHybrid
-			build.Partitions[0].Topology = Topology{Raw: "stage-a", ChipCount: 8}
-			build.Partitions[1].Topology = Topology{Raw: "stage-b", ChipCount: 64}
+			build.Partitions[0].topology = localPartitionTopologyA
+			build.Partitions[0].NumChips = 8
+			build.Partitions[1].topology = localPartitionTopologyB
+			build.Partitions[1].NumChips = 64
 			third := build.Partitions[1]
 			third.SourcePartitionID = 11
 			third.PartPath = testPart11Path
@@ -216,8 +223,10 @@ func TestRenderHybridLocalPartitions(t *testing.T) {
 			normalized := acquireTestSnapshot(t, writeV2CompilerFixture(t))
 			build := normalized.build
 			build.CompilationMode = BuildCompilationModeHybrid
-			build.Partitions[0].Topology = Topology{Raw: "stage-a", ChipCount: 8}
-			build.Partitions[1].Topology = Topology{Raw: "stage-b", ChipCount: 64}
+			build.Partitions[0].topology = localPartitionTopologyA
+			build.Partitions[0].NumChips = 8
+			build.Partitions[1].topology = localPartitionTopologyB
+			build.Partitions[1].NumChips = 64
 			third := build.Partitions[1]
 			third.SourcePartitionID = 11
 			third.PartPath = testPart11Path
