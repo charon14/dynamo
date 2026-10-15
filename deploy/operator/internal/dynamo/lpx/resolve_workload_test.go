@@ -87,7 +87,7 @@ func TestResolveWorkloadDerivesRuntimeShapeFromCompilationMode(t *testing.T) {
 	hx, err := ResolveWorkload(t.Context(), reader, dgd, singleGroupComponents(t, dgd), staticModelRegistry{"build": hxSnapshot})
 	require.NoError(t, err)
 	require.Equal(t, PipelineSingle, hx.Pipeline())
-	hxRequest := hx.modelProjections[0].RequestSpec(&MaterializationPlan{}, "agents")
+	hxRequest := hx.models[0].RequestSpec(&MaterializationPlan{}, "agents")
 	require.Equal(t, lpxv1alpha1.TargetFamilyHx16x8x2x3, hxRequest.TargetFamily)
 	require.Equal(t, lpxv1alpha1.WorkloadModeV3HxLPUOnly, hxRequest.WorkloadMode)
 	require.Equal(t, "LPX", hx.ServingComponentName())
@@ -238,10 +238,10 @@ func TestResolveWorkloadDerivesRuntimeShapeFromCompilationMode(t *testing.T) {
 	xt, err := ResolveWorkload(t.Context(), reader, dgd, singleGroupComponents(t, dgd), source)
 	require.NoError(t, err)
 	require.Equal(t, PipelineHybrid, xt.Pipeline())
-	xtRequest := xt.modelProjections[0].RequestSpec(&MaterializationPlan{}, "agents")
+	xtRequest := xt.models[0].RequestSpec(&MaterializationPlan{}, "agents")
 	require.Equal(t, lpxv1alpha1.TargetFamilyXt8888, xtRequest.TargetFamily)
 	require.Equal(t, lpxv1alpha1.WorkloadModeV2StrictHybrid, xtRequest.WorkloadMode)
-	require.Len(t, xt.modelProjections[0].configuredBuild.partitions, 2)
+	require.Len(t, xt.models[0].configuredBuild.partitions, 2)
 	plan, err = xt.PlanNodeLocalMaterialization("test-pcs")
 	require.NoError(t, err)
 	require.Equal(t, "cond", plan.CyborgTemplate)
@@ -266,16 +266,16 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 	reader := fake.NewClientBuilder().Build()
 	tests := []struct {
 		name     string
-		family   BuildFamily
+		family   buildTopology
 		wantMode lpxv1alpha1.WorkloadMode
 		packed   [2]bool
 	}{
-		{name: "v2", family: BuildFamilyXT, wantMode: lpxv1alpha1.WorkloadModeV2LPUOnly},
-		{name: "v2 packed draft", family: BuildFamilyXT, wantMode: lpxv1alpha1.WorkloadModeV2LPUOnly, packed: [2]bool{true, false}},
-		{name: "v2 packed target", family: BuildFamilyXT, wantMode: lpxv1alpha1.WorkloadModeV2LPUOnly, packed: [2]bool{false, true}},
-		{name: "v3", family: BuildFamilyHX, wantMode: lpxv1alpha1.WorkloadModeV3HxLPUOnly},
-		{name: "v3 packed draft", family: BuildFamilyHX, wantMode: lpxv1alpha1.WorkloadModeV3HxLPUOnly, packed: [2]bool{true, false}},
-		{name: "v3 packed target", family: BuildFamilyHX, wantMode: lpxv1alpha1.WorkloadModeV3HxLPUOnly, packed: [2]bool{false, true}},
+		{name: "v2", family: xtBuildTopology, wantMode: lpxv1alpha1.WorkloadModeV2LPUOnly},
+		{name: "v2 packed draft", family: xtBuildTopology, wantMode: lpxv1alpha1.WorkloadModeV2LPUOnly, packed: [2]bool{true, false}},
+		{name: "v2 packed target", family: xtBuildTopology, wantMode: lpxv1alpha1.WorkloadModeV2LPUOnly, packed: [2]bool{false, true}},
+		{name: "v3", family: hxBuildTopology, wantMode: lpxv1alpha1.WorkloadModeV3HxLPUOnly},
+		{name: "v3 packed draft", family: hxBuildTopology, wantMode: lpxv1alpha1.WorkloadModeV3HxLPUOnly, packed: [2]bool{true, false}},
+		{name: "v3 packed target", family: hxBuildTopology, wantMode: lpxv1alpha1.WorkloadModeV3HxLPUOnly, packed: [2]bool{false, true}},
 	}
 
 	for _, test := range tests {
@@ -285,7 +285,7 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 			agentCounts, requestCounts := [2]int32{4, 4}, [2]int{2, 2}
 			for index, packed := range test.packed {
 				fixture := newV2CompilerFixture()
-				if test.family == BuildFamilyHX {
+				if test.family == hxBuildTopology {
 					fixture = newV3CompilerFixture()
 					agentCounts[index], requestCounts[index] = 1, 1
 				}
@@ -298,7 +298,7 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 				}
 				snapshots[index] = acquireTestSnapshot(t, writeCompilerFixture(t, fixture))
 			}
-			if test.family == BuildFamilyXT && test.packed[0] == test.packed[1] {
+			if test.family == xtBuildTopology && test.packed[0] == test.packed[1] {
 				snapshots[1] = snapshots[0]
 			}
 
@@ -321,25 +321,25 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 			t.Log("Project the selected family, workload mode, and pipeline")
 			require.NoError(t, err)
 			require.Equal(t, before, dgd, "canonical ordering must not rewrite the authored target-first list")
-			request := selected.modelProjections[0].RequestSpec(&MaterializationPlan{}, "agents")
-			require.Equal(t, lpxv1alpha1.TargetFamily(test.family), request.TargetFamily)
+			request := selected.models[0].RequestSpec(&MaterializationPlan{}, "agents")
+			require.Equal(t, test.family.target(), request.TargetFamily)
 			require.Equal(t, test.wantMode, request.WorkloadMode)
 			require.Equal(t, PipelineSpecDecode, selected.Pipeline())
 			require.Equal(t, "lpx", selected.ServingComponentName())
 
 			t.Log("Expand draft fanout while preserving model and template identity order")
-			projections := selected.ModelProjections()
+			projections := selected.Models()
 			require.Len(t, projections, 3)
 			require.Equal(
 				t,
 				[]string{"draft0", "draft1", "target"},
-				[]string{projections[0].Model(), projections[1].Model(), projections[2].Model()},
+				[]string{projections[0].Name(), projections[1].Name(), projections[2].Name()},
 			)
 			plan, err := selected.PlanNodeLocalMaterialization("test-pcs")
 			require.NoError(t, err)
 			require.EqualValues(t, 1, plan.Replicas, "draft fanout must not become the shared scaling-group axis")
-			require.Equal(t, "small", projections[0].stage)
-			require.Equal(t, "lpx", projections[2].stage)
+			require.Equal(t, "small", projections[0].componentName)
+			require.Equal(t, "lpx", projections[2].componentName)
 			require.Equal(
 				t,
 				[]string{"agt0", "agt1", "agt2"},
@@ -374,8 +374,11 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 			require.NotEqual(t, WorkloadDigest{}, selected.Digest())
 			require.NotEqual(t, projections[0].Digest(), selected.Digest())
 			mixedFamily := *projections[2]
-			mixedFamily.configuredBuild.family = BuildFamily("other")
-			_, err = workloadSetDigest([]*ModelProjection{projections[0], &mixedFamily})
+			mixedFamily.configuredBuild.topology = xtBuildTopology
+			if projections[0].configuredBuild.topology == xtBuildTopology {
+				mixedFamily.configuredBuild.topology = hxBuildTopology
+			}
+			_, err = workloadSetDigest([]*Model{projections[0], &mixedFamily})
 			require.ErrorContains(t, err, "mixed target families")
 
 			t.Log("Preserve compiled placement without repeating runtime-derived model settings")
@@ -386,7 +389,7 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 				request := projection.RequestSpec(plan, plan.Agents[index].TemplateName)
 				require.Len(t, request.Partitions, requestCounts[index/2])
 				require.EqualValues(t, original[0].sourcePartitionID, request.Partitions[0].CompilerPartitionID)
-				require.Equal(t, projection.Model(), request.NodeLocal.Model)
+				require.Equal(t, projection.Name(), request.NodeLocal.Model)
 				if test.packed[index/2] {
 					require.Empty(t, request.PropSyncConnectors)
 				}
@@ -415,8 +418,8 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 					expanded, err := ResolveWorkload(t.Context(), reader, dgd, singleGroupComponents(t, dgd), source)
 					require.NoError(t, err)
 					models := make([]string, 0, len(expansion.models))
-					for _, projection := range expanded.ModelProjections() {
-						models = append(models, projection.Model())
+					for _, projection := range expanded.Models() {
+						models = append(models, projection.Name())
 					}
 
 					t.Log("Preserve the expected logical model ordering")
@@ -424,16 +427,16 @@ func TestResolveWorkloadSpecDecodeV2AndV3(t *testing.T) {
 				})
 			}
 
-			if test.family == BuildFamilyHX {
+			if test.family == hxBuildTopology {
 				t.Log("Project separate draft and target roles from the same immutable HX build")
 				draft := &dgd.Spec.Components[1]
 				draft.Replicas = nil
 				draft.LPX.BuildID = "target-build"
 				shared, err := ResolveWorkload(t.Context(), reader, dgd, singleGroupComponents(t, dgd), source)
 				require.NoError(t, err)
-				projections := shared.ModelProjections()
+				projections := shared.Models()
 				require.Len(t, projections, 2)
-				require.Equal(t, []string{"draft0", "target"}, []string{projections[0].Model(), projections[1].Model()})
+				require.Equal(t, []string{"draft0", "target"}, []string{projections[0].Name(), projections[1].Name()})
 				require.Equal(t, "target-build", projections[0].runtimeBuildRef)
 				require.Equal(t, "target-build", projections[1].runtimeBuildRef)
 				require.NotEqual(t, projections[0].Digest(), projections[1].Digest())

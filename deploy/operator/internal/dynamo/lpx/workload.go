@@ -18,17 +18,17 @@ import (
 // for scheduling and runtime materialization.
 // Its methods require a successfully resolved, non-nil workload with projections.
 type Workload struct {
-	modelProjections     []*ModelProjection
+	models               []*Model
 	digest               WorkloadDigest
 	scalingGroupReplicas int32
 	conductorReplicas    int32
 	plan                 *MaterializationPlan
 }
 
-// ModelProjections returns a read-only view of the workload's model projections.
+// Models returns a read-only view of the workload's model projections.
 // Callers must not modify the slice or its projections.
-func (w *Workload) ModelProjections() []*ModelProjection {
-	return w.modelProjections
+func (w *Workload) Models() []*Model {
+	return w.models
 }
 
 // Digest returns the workload's digest.
@@ -38,16 +38,16 @@ func (w *Workload) Digest() WorkloadDigest {
 
 // Pipeline returns the workload's runtime pipeline.
 func (w *Workload) Pipeline() Pipeline {
-	return w.modelProjections[0].pipeline
+	return w.models[0].pipeline
 }
 
 // ComponentNames returns this workload's members in canonical runtime order.
 func (w *Workload) ComponentNames() []string {
 	// Draft fanout can contribute several consecutive models from one component.
 	var names []string
-	for _, projection := range w.modelProjections {
-		if len(names) == 0 || names[len(names)-1] != projection.stage {
-			names = append(names, projection.stage)
+	for _, projection := range w.models {
+		if len(names) == 0 || names[len(names)-1] != projection.componentName {
+			names = append(names, projection.componentName)
 		}
 	}
 	return names
@@ -55,7 +55,7 @@ func (w *Workload) ComponentNames() []string {
 
 // ServingComponentName returns the conductor owner, placed last by ResolveWorkload.
 func (w *Workload) ServingComponentName() string {
-	return w.modelProjections[len(w.modelProjections)-1].stage
+	return w.models[len(w.models)-1].componentName
 }
 
 // WithNames returns an immutable workload named inside pcsName. group is empty
@@ -115,8 +115,8 @@ func (w *Workload) ValidateReplicas(replicas int32) error {
 }
 
 // RequestSpec returns a fresh request for a model belonging to this workload.
-func (w *Workload) RequestSpec(model *ModelProjection, replica int32) lpxv1alpha1.LPUPipelineRequestSpec {
-	index := slices.Index(w.modelProjections, model)
+func (w *Workload) RequestSpec(model *Model, replica int32) lpxv1alpha1.LPUPipelineRequestSpec {
+	index := slices.Index(w.models, model)
 	plan := w.plan.ForReplica(replica)
 	return model.RequestSpec(plan, plan.Agents[index].CliqueName)
 }

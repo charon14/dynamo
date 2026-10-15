@@ -94,7 +94,7 @@ func TestProjectModelV2LocalPartitions(t *testing.T) {
 			build.selectedPropSyncChains = [][]int{{7, 8}}
 
 			t.Log("Project the build with the selected local partitions")
-			projections, err := appendModelProjections(nil, ModelProjectionInput{
+			projections, err := appendModelProjections(nil, modelProjectionInput{
 				Pipeline: test.pipeline, Models: []string{"default"}, Build: normalized,
 				LocalPartitions: test.selection,
 			})
@@ -117,7 +117,7 @@ func TestProjectModelV2LocalPartitions(t *testing.T) {
 			require.Equal(t, test.wantAgents, projection.AgentReplicas())
 
 			t.Log("Publish only remote runtime partitions to Agents and Cyborg")
-			require.Equal(t, test.wantRuntimeIDs, resolvedPartitionData([]*ModelProjection{projection})["partition_ids"])
+			require.Equal(t, test.wantRuntimeIDs, resolvedPartitionData([]*Model{projection})["partition_ids"])
 			require.Equal(t, test.wantLocalIDs, projection.localPartitionIDs)
 
 			t.Log("Change the workload digest when partitions move to the GPU")
@@ -189,7 +189,7 @@ func TestApplyLocalPartitionIDs(t *testing.T) {
 
 			t.Log("Publish the resolved local partitions into the Cyborg container")
 			container := &corev1.Container{Env: test.env, EnvFrom: test.envFrom}
-			applyLocalPartitionIDs(container, &ModelProjection{localPartitionIDs: test.localIDs})
+			applyLocalPartitionIDs(container, &Model{localPartitionIDs: test.localIDs})
 			require.Equal(t, test.wantEnv, container.Env)
 		})
 	}
@@ -232,7 +232,7 @@ func TestRenderHybridLocalPartitions(t *testing.T) {
 			third.partPath = testPart11Path
 			build.partitions = append(build.partitions, third)
 			build.selectedPropSyncChains = [][]int{{7, 8}}
-			projections, err := appendModelProjections(nil, ModelProjectionInput{
+			projections, err := appendModelProjections(nil, modelProjectionInput{
 				Pipeline: PipelineHybrid, Models: []string{"default"}, Build: normalized,
 				RuntimeBuildRef: "model-build", LocalPartitions: test.selection,
 			})
@@ -285,7 +285,7 @@ func TestProjectModelV2LocalPartitionsKeepsPhysicalBuildBound(t *testing.T) {
 	}
 
 	t.Log("Reject the oversized build even when every partition runs locally")
-	_, err := appendModelProjections(nil, ModelProjectionInput{
+	_, err := appendModelProjections(nil, modelProjectionInput{
 		Pipeline: PipelineHybrid, Models: []string{"default"}, Build: normalized,
 		LocalPartitions: &dynamov1beta1.LPXLocalPartitions{Mode: dynamov1beta1.LPXLocalPartitionsModeAll},
 	})
@@ -368,7 +368,7 @@ func TestProjectModelV3LocalPartitions(t *testing.T) {
 			normalized := acquireTestSnapshot(t, writeCompilerFixture(t, fixture))
 
 			t.Log("Project the build with the selected local partitions")
-			projections, err := appendModelProjections(nil, ModelProjectionInput{
+			projections, err := appendModelProjections(nil, modelProjectionInput{
 				Pipeline: test.pipeline, Models: []string{"default"}, Build: normalized,
 				LocalPartitions: test.selection,
 			})
@@ -405,7 +405,7 @@ func TestProjectModelV3LocalPartitions(t *testing.T) {
 			require.JSONEq(t, test.wantPropSyncInfo, string(metadata.PropSyncInfo))
 
 			t.Log("Publish only remote runtime partitions to Agents and Cyborg")
-			require.Equal(t, test.wantRuntimeIDs, resolvedPartitionData([]*ModelProjection{projection})["partition_ids"])
+			require.Equal(t, test.wantRuntimeIDs, resolvedPartitionData([]*Model{projection})["partition_ids"])
 			require.Equal(t, test.wantLocalIDs, projection.localPartitionIDs)
 
 			t.Log("Change the workload digest when partitions move to the GPU")
@@ -448,7 +448,7 @@ func TestProjectModelV3LocalPartitionsRejectsUnsupportedBuilds(t *testing.T) {
 			normalized := acquireTestSnapshot(t, writeCompilerFixture(t, fixture))
 
 			t.Log("Reject a local selection that the build cannot serve")
-			_, err := appendModelProjections(nil, ModelProjectionInput{
+			_, err := appendModelProjections(nil, modelProjectionInput{
 				Pipeline: test.pipeline, Models: []string{"default"}, Build: normalized,
 				LocalPartitions: &dynamov1beta1.LPXLocalPartitions{Mode: dynamov1beta1.LPXLocalPartitionsModeIDs, IDs: []int64{1}},
 			})
@@ -471,7 +471,7 @@ func TestProjectModelV3LocalPartitionsKeepsPhysicalBuildBound(t *testing.T) {
 	normalized := acquireTestSnapshot(t, writeCompilerFixture(t, fixture))
 
 	t.Log("Reject the oversized build even when every partition runs locally")
-	_, err := appendModelProjections(nil, ModelProjectionInput{
+	_, err := appendModelProjections(nil, modelProjectionInput{
 		Pipeline: PipelineHybrid, Models: []string{"default"}, Build: normalized,
 		LocalPartitions: &dynamov1beta1.LPXLocalPartitions{Mode: dynamov1beta1.LPXLocalPartitionsModeAll},
 	})
