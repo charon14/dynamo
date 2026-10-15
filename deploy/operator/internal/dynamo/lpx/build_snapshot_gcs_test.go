@@ -22,7 +22,7 @@ func manifestV2Payload(t *testing.T) []byte {
 	return payload
 }
 
-func TestAcquireBuildSnapshotPreservesReadFailures(t *testing.T) {
+func TestAcquireBuildPreservesReadFailures(t *testing.T) {
 	t.Parallel()
 
 	t.Log("Define missing and temporarily unavailable manifest reads")
@@ -40,7 +40,7 @@ func TestAcquireBuildSnapshotPreservesReadFailures(t *testing.T) {
 			}
 			registry, err := NewModelRegistry("gs://bucket/registry", client)
 			require.NoError(t, err)
-			snapshot, err := registry.AcquireBuildSnapshot(t.Context(), "model/build")
+			snapshot, err := registry.AcquireBuild(t.Context(), "model/build")
 
 			t.Log("Preserve the transport failure separately from invalid compiler input")
 			require.ErrorIs(t, err, test.readErr)
@@ -82,9 +82,9 @@ func TestGCSModelRegistrySnapshotUsesManifestV2FromModelExpress(t *testing.T) {
 			started := time.Now()
 			build, err := normalizeRegistryFixtureBuild(testCase.ctx, registry, testCase.ref)
 			require.NoError(t, err)
-			require.Equal(t, "gs://bucket/registry/model/build", build.Path)
-			require.Len(t, build.Partitions, 1)
-			require.Equal(t, "part-0", build.Partitions[0].PartPath)
+			require.Equal(t, "gs://bucket/registry/model/build", build.path)
+			require.Len(t, build.partitions, 1)
+			require.Equal(t, "part-0", build.partitions[0].partPath)
 			require.Len(t, client.listRequests, 1)
 			require.Len(t, client.filesRequests, 1)
 			for _, request := range client.filesRequests {

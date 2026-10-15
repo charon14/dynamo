@@ -22,9 +22,9 @@ func TestBuildFromGbuildManifestV2ProjectsRuntimeIO(t *testing.T) {
 	t.Log("Project the complete build contract")
 	build, err := buildFromGbuildManifestV2("gs://models/build", manifest)
 	require.NoError(t, err)
-	require.EqualValues(t, 4, build.IOFPGACount)
-	require.EqualValues(t, 2, build.IOFanoutFactor)
-	require.Len(t, build.Partitions, 1)
+	require.EqualValues(t, 4, build.ioFPGACount)
+	require.EqualValues(t, 2, build.ioFanoutFactor)
+	require.Len(t, build.partitions, 1)
 
 	t.Log("Reject an unsupported contract revision before lowering the manifest")
 	manifest.SetContractRevision(manifest.ContractRevision() + 1)
@@ -98,7 +98,7 @@ func TestManifestReadersIgnoreExecutionMetadata(t *testing.T) {
 	}
 }
 
-func TestAcquireBuildSnapshotRejectsInvalidHXArtifacts(t *testing.T) {
+func TestAcquireBuildRejectsInvalidHXArtifacts(t *testing.T) {
 	t.Log("Define malformed HX artifact inventories")
 	tests := []struct {
 		name    string
@@ -126,7 +126,7 @@ func TestAcquireBuildSnapshotRejectsInvalidHXArtifacts(t *testing.T) {
 			buildDir := writeCompilerFixture(t, fixture)
 
 			t.Log("Reject malformed HX artifacts before publishing the acquired snapshot")
-			snapshot, err := (&defaultModelRegistry{}).AcquireBuildSnapshot(t.Context(), buildDir)
+			snapshot, err := (&defaultModelRegistry{}).AcquireBuild(t.Context(), buildDir)
 			require.ErrorIs(t, err, errInvalidBuildManifest)
 			require.ErrorContains(t, err, test.wantErr)
 			require.Nil(t, snapshot)

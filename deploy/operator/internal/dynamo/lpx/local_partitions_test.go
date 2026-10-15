@@ -81,21 +81,21 @@ func TestProjectModelV2LocalPartitions(t *testing.T) {
 
 			t.Log("Create a hybrid build with chain 7-8 and an independent partition 11")
 			normalized := acquireTestSnapshot(t, writeV2CompilerFixture(t))
-			build := normalized.build
-			build.CompilationMode = BuildCompilationModeHybrid
-			build.Partitions[0].topology = localPartitionTopologyA
-			build.Partitions[0].NumChips = 8
-			build.Partitions[1].topology = localPartitionTopologyB
-			build.Partitions[1].NumChips = 64
-			third := build.Partitions[1]
-			third.SourcePartitionID = 11
-			third.PartPath = testPart11Path
-			build.Partitions = append(build.Partitions, third)
-			build.SelectedPropSyncChains = [][]int{{7, 8}}
+			build := normalized
+			build.compilationMode = compilationModeHybrid
+			build.partitions[0].topology = localPartitionTopologyA
+			build.partitions[0].numChips = 8
+			build.partitions[1].topology = localPartitionTopologyB
+			build.partitions[1].numChips = 64
+			third := build.partitions[1]
+			third.sourcePartitionID = 11
+			third.partPath = testPart11Path
+			build.partitions = append(build.partitions, third)
+			build.selectedPropSyncChains = [][]int{{7, 8}}
 
 			t.Log("Project the build with the selected local partitions")
 			projections, err := appendModelProjections(nil, ModelProjectionInput{
-				Pipeline: test.pipeline, Models: []string{"default"}, BuildSnapshot: normalized,
+				Pipeline: test.pipeline, Models: []string{"default"}, Build: normalized,
 				LocalPartitions: test.selection,
 			})
 			if test.wantErr != "" {
@@ -221,19 +221,19 @@ func TestRenderHybridLocalPartitions(t *testing.T) {
 
 			t.Log("Project a hybrid build with chain 7-8 and an independent partition 11")
 			normalized := acquireTestSnapshot(t, writeV2CompilerFixture(t))
-			build := normalized.build
-			build.CompilationMode = BuildCompilationModeHybrid
-			build.Partitions[0].topology = localPartitionTopologyA
-			build.Partitions[0].NumChips = 8
-			build.Partitions[1].topology = localPartitionTopologyB
-			build.Partitions[1].NumChips = 64
-			third := build.Partitions[1]
-			third.SourcePartitionID = 11
-			third.PartPath = testPart11Path
-			build.Partitions = append(build.Partitions, third)
-			build.SelectedPropSyncChains = [][]int{{7, 8}}
+			build := normalized
+			build.compilationMode = compilationModeHybrid
+			build.partitions[0].topology = localPartitionTopologyA
+			build.partitions[0].numChips = 8
+			build.partitions[1].topology = localPartitionTopologyB
+			build.partitions[1].numChips = 64
+			third := build.partitions[1]
+			third.sourcePartitionID = 11
+			third.partPath = testPart11Path
+			build.partitions = append(build.partitions, third)
+			build.selectedPropSyncChains = [][]int{{7, 8}}
 			projections, err := appendModelProjections(nil, ModelProjectionInput{
-				Pipeline: PipelineHybrid, Models: []string{"default"}, BuildSnapshot: normalized,
+				Pipeline: PipelineHybrid, Models: []string{"default"}, Build: normalized,
 				RuntimeBuildRef: "model-build", LocalPartitions: test.selection,
 			})
 			require.NoError(t, err)
@@ -273,20 +273,20 @@ func TestProjectModelV2LocalPartitionsKeepsPhysicalBuildBound(t *testing.T) {
 
 	t.Log("Create a hybrid build with one more physical partition than the LPX limit")
 	normalized := acquireTestSnapshot(t, writeV2CompilerFixture(t))
-	build := normalized.build
-	build.CompilationMode = BuildCompilationModeHybrid
-	build.SelectedPropSyncChains = nil
-	template := build.Partitions[0]
-	build.Partitions = make([]BuildPartition, 0, maxLPXPartitions+1)
+	build := normalized
+	build.compilationMode = compilationModeHybrid
+	build.selectedPropSyncChains = nil
+	template := build.partitions[0]
+	build.partitions = make([]buildPartition, 0, maxLPXPartitions+1)
 	for id := range maxLPXPartitions + 1 {
 		partition := template
-		partition.SourcePartitionID = id
-		build.Partitions = append(build.Partitions, partition)
+		partition.sourcePartitionID = id
+		build.partitions = append(build.partitions, partition)
 	}
 
 	t.Log("Reject the oversized build even when every partition runs locally")
 	_, err := appendModelProjections(nil, ModelProjectionInput{
-		Pipeline: PipelineHybrid, Models: []string{"default"}, BuildSnapshot: normalized,
+		Pipeline: PipelineHybrid, Models: []string{"default"}, Build: normalized,
 		LocalPartitions: &dynamov1beta1.LPXLocalPartitions{Mode: dynamov1beta1.LPXLocalPartitionsModeAll},
 	})
 	require.EqualError(t, err, "LPX projection has 257 partitions, limit is 1..256")
@@ -369,7 +369,7 @@ func TestProjectModelV3LocalPartitions(t *testing.T) {
 
 			t.Log("Project the build with the selected local partitions")
 			projections, err := appendModelProjections(nil, ModelProjectionInput{
-				Pipeline: test.pipeline, Models: []string{"default"}, BuildSnapshot: normalized,
+				Pipeline: test.pipeline, Models: []string{"default"}, Build: normalized,
 				LocalPartitions: test.selection,
 			})
 			if test.wantErr != "" {
@@ -449,7 +449,7 @@ func TestProjectModelV3LocalPartitionsRejectsUnsupportedBuilds(t *testing.T) {
 
 			t.Log("Reject a local selection that the build cannot serve")
 			_, err := appendModelProjections(nil, ModelProjectionInput{
-				Pipeline: test.pipeline, Models: []string{"default"}, BuildSnapshot: normalized,
+				Pipeline: test.pipeline, Models: []string{"default"}, Build: normalized,
 				LocalPartitions: &dynamov1beta1.LPXLocalPartitions{Mode: dynamov1beta1.LPXLocalPartitionsModeIDs, IDs: []int64{1}},
 			})
 			require.EqualError(t, err, test.wantErr)
@@ -472,7 +472,7 @@ func TestProjectModelV3LocalPartitionsKeepsPhysicalBuildBound(t *testing.T) {
 
 	t.Log("Reject the oversized build even when every partition runs locally")
 	_, err := appendModelProjections(nil, ModelProjectionInput{
-		Pipeline: PipelineHybrid, Models: []string{"default"}, BuildSnapshot: normalized,
+		Pipeline: PipelineHybrid, Models: []string{"default"}, Build: normalized,
 		LocalPartitions: &dynamov1beta1.LPXLocalPartitions{Mode: dynamov1beta1.LPXLocalPartitionsModeAll},
 	})
 	require.EqualError(t, err, "LPX projection has 257 partitions, limit is 1..256")
