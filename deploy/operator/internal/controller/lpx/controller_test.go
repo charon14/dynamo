@@ -59,7 +59,7 @@ func TestIndependentLPXRoleScalingAndReadiness(t *testing.T) {
 	r := newLPXTestReconciler(t, registry, child, dgd)
 	workloads, plans, err := r.resolveWorkloads(t.Context(), child, dgd)
 	require.NoError(t, err)
-	pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+	pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 	require.NoError(t, err)
 	objects := materializeLPXTestPCS(t, child, pcs, plans["lpx"], plans[second.ComponentName])
 	for _, object := range objects {
@@ -254,7 +254,7 @@ func TestLPXExternalCyborgCapacityValidation(t *testing.T) {
 	r := newLPXTestReconciler(t, registry, child, dgd)
 	workloads, plans, err := r.resolveWorkloads(t.Context(), child, dgd)
 	require.NoError(t, err)
-	pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+	pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 	require.NoError(t, err)
 	objects := materializeLPXTestPCS(t, child, pcs, plans["lpx"])
 	for _, object := range objects {
@@ -916,7 +916,7 @@ func TestLPXServiceReconciliation(t *testing.T) {
 	beforeModelService := modelService.DeepCopy()
 
 	t.Log("Publish the LPX-owned endpoint with its serving-role selector")
-	_, resources, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+	_, resources, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 	require.NoError(t, err)
 	require.NoError(t, r.reconcileRuntimeResources(t.Context(), child, resources))
 	service := &corev1.Service{}
@@ -931,7 +931,7 @@ func TestLPXServiceReconciliation(t *testing.T) {
 	expected := service.DeepCopy()
 	for _, global := range []bool{true, false} {
 		dgd.Spec.Components[0].GlobalDynamoNamespace = global
-		_, resources, err = r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+		_, resources, err = r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 		require.NoError(t, err)
 		require.NoError(t, r.reconcileRuntimeResources(t.Context(), child, resources))
 		require.NoError(t, r.Get(t.Context(), key, service))
@@ -3454,7 +3454,7 @@ func TestLPXWaitsForAllScalingGroups(t *testing.T) {
 			r := newLPXTestReconciler(t, registry, child, dgd)
 			workloads, plans, err := r.resolveWorkloads(t.Context(), child, dgd)
 			require.NoError(t, err)
-			pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+			pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 			require.NoError(t, err)
 			createLPXTestObjects(t, t.Context(), r.Client, materializeLPXTestPCS(t, child, pcs, plans["lpx"], plans["external"])...)
 			require.NoError(t, r.Get(t.Context(), client.ObjectKeyFromObject(pcs), pcs))
@@ -3534,7 +3534,7 @@ func TestIndependentLPXWorkloadsScaleAndReportReadiness(t *testing.T) {
 	workloads, plans, err := r.resolveWorkloads(t.Context(), child, dgd)
 	require.NoError(t, err)
 	require.Len(t, workloads, 2)
-	pcs, resources, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+	pcs, resources, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 	require.NoError(t, err)
 	require.Len(t, resources, 4)
 	names := make(map[string]bool)
@@ -3548,7 +3548,7 @@ func TestIndependentLPXWorkloadsScaleAndReportReadiness(t *testing.T) {
 	slices.Reverse(reordered.Spec.Components)
 	reorderedWorkloads, reorderedPlans, err := r.resolveWorkloads(t.Context(), child, reordered)
 	require.NoError(t, err)
-	reorderedPCS, reorderedResources, err := r.renderPodCliqueSet(t.Context(), child, reordered, reorderedWorkloads, reorderedPlans, nil)
+	reorderedPCS, reorderedResources, err := r.renderPodCliqueSet(t.Context(), child, reordered, reorderedWorkloads, reorderedPlans)
 	require.NoError(t, err)
 	require.Equal(t, pcs, reorderedPCS)
 	require.Equal(t, resources, reorderedResources)
@@ -3770,7 +3770,7 @@ func TestIndependentLPXDeadlineCleanup(t *testing.T) {
 			r := newLPXTestReconciler(t, registry, child, dgd)
 			workloads, plans, err := r.resolveWorkloads(t.Context(), child, dgd)
 			require.NoError(t, err)
-			pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans, nil)
+			pcs, _, err := r.renderPodCliqueSet(t.Context(), child, dgd, workloads, plans)
 			require.NoError(t, err)
 			firstPlan, secondPlan := plans["lpx"], plans["timeout-engine"]
 			secondPlan.Replicas = 2
